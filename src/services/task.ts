@@ -138,3 +138,58 @@ export async function completeTaskById(
     throw error;
   }
 }
+
+/**
+ * Cập nhật trạng thái task thành CANCELLED theo Telegram Message ID gốc trong chat
+ */
+export async function cancelTaskByMessageId(
+  telegramChatId: number,
+  telegramMessageId: number,
+): Promise<ITask | null> {
+  try {
+    return await TaskModel.findOneAndUpdate(
+      {
+        telegramChatId,
+        telegramMessageId,
+      },
+      {
+        $set: { status: TaskStatus.CANCELLED },
+      },
+      { new: true },
+    );
+  } catch (error) {
+    console.error(
+      `[TaskService] Error cancelling task by messageId=${telegramMessageId} in chatId=${telegramChatId}:`,
+      error,
+    );
+    throw error;
+  }
+}
+
+/**
+ * Cập nhật trạng thái task thành CANCELLED theo Task Mongo ID
+ */
+export async function cancelTaskById(
+  telegramChatId: number,
+  taskId: string,
+): Promise<ITask | null> {
+  try {
+    return await TaskModel.findOneAndUpdate(
+      {
+        _id: taskId,
+        telegramChatId,
+      },
+      {
+        $set: { status: TaskStatus.CANCELLED },
+      },
+      { new: true },
+    );
+  } catch (error) {
+    console.error(
+      `[TaskService] Error cancelling task by taskId=${taskId} in chatId=${telegramChatId}:`,
+      error,
+    );
+    throw error;
+  }
+}
+

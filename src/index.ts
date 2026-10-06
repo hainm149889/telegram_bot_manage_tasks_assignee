@@ -10,6 +10,8 @@ import {
   createTaskFromMessage,
   completeTaskByMessageId,
   completeTaskById,
+  cancelTaskByMessageId,
+  cancelTaskById,
   getAllTasksByChatId,
   acceptTaskByMessageId,
 } from "./services/task";
@@ -18,11 +20,20 @@ import {
   formatTaskListMessage,
   formatTaskCompletedMessage,
   formatTaskAcceptedMessage,
+  formatTaskCancelledMessage,
 } from "./telegram/response-formatter";
 
 const bot = new Bot(env.telegramBotToken);
 
-// Danh sách các từ khóa tiếp nhận task khi reply
+// Regex phát hiện phản hồi hoàn thành task (Completed)
+const COMPLETED_REGEX =
+  /^(?:(?:\/(?:done|completed)(?:\s+([0-9a-fA-F]{24}|\w+))?)|xong rồi|xong|ok rồi ạ|ok done|done|đã xong|hoàn thành|đã làm xong)$/i;
+
+// Regex phát hiện phản hồi hủy task (Cancelled)
+const CANCELLED_REGEX =
+  /^(?:(?:\/(?:cancel|cancelled)(?:\s+([0-9a-fA-F]{24}|\w+))?)|thôi|dừng|để vậy đã|tạm vậy đã|stop|hủy đi|không phải làm|hủy|cancel|bỏ)$/i;
+
+// Danh sách các từ khóa tiếp nhận task khi reply (Accepted)
 const ACCEPT_KEYWORDS = [
   "ok",
   "oke",
@@ -67,8 +78,8 @@ bot.command(["tasks", "list"], async (ctx) => {
   }
 });
 
-// 2. Xử lý lệnh /done hoặc /complete
-bot.command(["done", "complete"], async (ctx) => {
+// 2. Xử lý lệnh /done hoặc /complete /completed
+bot.command(["done", "complete", "completed"], async (ctx) => {
   try {
     const chatId = ctx.chat?.id;
     if (!chatId) return;
@@ -121,6 +132,63 @@ bot.command(["done", "complete"], async (ctx) => {
   } catch (error) {
     console.error("[ERROR] Failed to execute /done command:", error);
     await ctx.reply("❌ Đã có lỗi xảy ra khi hoàn thành task.");
+  }
+});
+
+// 3. Xử lý lệnh /cancel hoặc /cancelled
+bot.command(["cancel", "cancelled"], async (ctx) => {
+  try {
+    const chatId = ctx.chat?.id;
+    if (!chatId) return;
+
+    if (!env.telegramAllowedChatIds.includes(chatId.toString())) {
+      console.log(`[IGNORED /cancel] Non-whitelisted chat: ${chatId}`);
+      return;
+    }
+
+    const repliedMessageId = ctx.msg?.reply_to_message?.message_id;
+    const args = ctx.match?.trim();
+
+    let updatedTask = null;
+
+    if (repliedMessageId) {
+      updatedTask = await cancelTaskByMessageId(chatId, repliedMessageId);
+    } else if (args) {
+      if (!/^[0-9a-fA-F]{24}$/.test(args)) {
+        await ctx.reply(
+          "⚠️ Task ID không hợp lệ. Vui lòng kiểm tra lại ID hoặc reply trực tiếp vào tin nhắn task gốc.",
+          { parse_mode: "HTML" },
+        );
+        return;
+      }
+      updatedTask = await cancelTaskById(chatId, args);
+    } else {
+      await ctx.reply(
+        "💡 <b>Hướng dẫn sử dụng lệnh /cancel:</b>\n" +
+          "1. Reply trực tiếp lệnh <code>/cancel</code> vào tin nhắn tạo task gốc.\n" +
+          "2. Hoặc gõ lệnh: <code>/cancel &lt;taskId&gt;</code>",
+        { parse_mode: "HTML" },
+      );
+      return;
+    }
+
+    if (!updatedTask) {
+      await ctx.reply("❌ Không tìm thấy task tương ứng trong nhóm này.", {
+        parse_mode: "HTML",
+      });
+      return;
+    }
+
+    const responseMsg = formatTaskCancelledMessage(updatedTask);
+    await ctx.reply(responseMsg, {
+      parse_mode: "HTML",
+      reply_parameters: ctx.msg?.message_id
+        ? { message_id: ctx.msg.message_id }
+        : undefined,
+    });
+  } catch (error) {
+    console.error("[ERROR] Failed to execute /cancel command:", error);
+    await ctx.reply("❌ Đã có lỗi xảy ra khi hủy task.");
   }
 });
 
@@ -197,19 +265,73 @@ bot.on(["message", "channel_post"], async (ctx) => {
     return;
   }
 
-  // --- Kiểm tra xem đây có phải tin nhắn Reply chứa TỪ KHÓA TIẾP NHẬN không ---
+  // --- Kiểm tra tự động chuyển đổi trạng thái Task (Completed, Cancelled, Accepted) ---
   const repliedMessageId = ctx.msg?.reply_to_message?.message_id;
-  const messageText = (
+  const rawMessageContent = (
     normalized.message.text ||
     normalized.message.caption ||
     ""
-  )
-    .trim()
-    .toLowerCase();
+  ).trim();
+  const messageTextLower = rawMessageContent.toLowerCase();
 
-  if (repliedMessageId && messageText) {
+  // 1. Kiểm tra trạng thái: HOÀN THÀNH (Completed)
+  const completedMatch = rawMessageContent.match(COMPLETED_REGEX);
+  if (completedMatch && (repliedMessageId || completedMatch[1])) {
+    let completedTask = null;
+    const targetTaskId = completedMatch[1]?.trim();
+
+    if (targetTaskId && /^[0-9a-fA-F]{24}$/.test(targetTaskId)) {
+      completedTask = await completeTaskById(normalized.chat.id, targetTaskId);
+    } else if (repliedMessageId) {
+      completedTask = await completeTaskByMessageId(
+        normalized.chat.id,
+        repliedMessageId,
+      );
+    }
+
+    if (completedTask) {
+      console.log(
+        `[TASK COMPLETED] Task #${completedTask._id} marked as COMPLETED`,
+      );
+      await ctx.reply(formatTaskCompletedMessage(completedTask), {
+        parse_mode: "HTML",
+        reply_parameters: { message_id: ctx.msg.message_id },
+      });
+      return;
+    }
+  }
+
+  // 2. Kiểm tra trạng thái: ĐÃ HỦY (Cancelled)
+  const cancelledMatch = rawMessageContent.match(CANCELLED_REGEX);
+  if (cancelledMatch && (repliedMessageId || cancelledMatch[1])) {
+    let cancelledTask = null;
+    const targetTaskId = cancelledMatch[1]?.trim();
+
+    if (targetTaskId && /^[0-9a-fA-F]{24}$/.test(targetTaskId)) {
+      cancelledTask = await cancelTaskById(normalized.chat.id, targetTaskId);
+    } else if (repliedMessageId) {
+      cancelledTask = await cancelTaskByMessageId(
+        normalized.chat.id,
+        repliedMessageId,
+      );
+    }
+
+    if (cancelledTask) {
+      console.log(
+        `[TASK CANCELLED] Task #${cancelledTask._id} marked as CANCELLED`,
+      );
+      await ctx.reply(formatTaskCancelledMessage(cancelledTask), {
+        parse_mode: "HTML",
+        reply_parameters: { message_id: ctx.msg.message_id },
+      });
+      return;
+    }
+  }
+
+  // 3. Kiểm tra trạng thái: TIẾP NHẬN (Accepted) khi Reply từ khóa
+  if (repliedMessageId && messageTextLower) {
     const isAcceptKeyword = ACCEPT_KEYWORDS.some(
-      (kw) => messageText === kw || messageText.includes(kw),
+      (kw) => messageTextLower === kw || messageTextLower.includes(kw),
     );
 
     if (isAcceptKeyword) {

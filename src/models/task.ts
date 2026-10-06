@@ -3,7 +3,7 @@ import { Schema, model, Document } from "mongoose";
 export enum TaskStatus {
   PENDING = "PENDING",
   ACCEPTED = "ACCEPTED",
-  IN_PROGRESS = "IN_PROGRESS",
+  //   IN_PROGRESS = "IN_PROGRESS",
   COMPLETED = "COMPLETED",
   CANCELLED = "CANCELLED",
 }

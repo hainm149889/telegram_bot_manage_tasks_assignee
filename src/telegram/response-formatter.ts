@@ -14,8 +14,8 @@ function getStatusIcon(status: TaskStatus): string {
       return "⏳";
     case TaskStatus.ACCEPTED:
       return "👌";
-    case TaskStatus.IN_PROGRESS:
-      return "🔄";
+    // case TaskStatus.IN_PROGRESS:
+    //   return "🔄";
     case TaskStatus.COMPLETED:
       return "✅";
     case TaskStatus.CANCELLED:
@@ -66,24 +66,50 @@ export async function sendTaskCreatedReply(
 }
 
 /**
- * Format toàn bộ danh sách task (bao gồm cả COMPLETED)
+ * Format toàn bộ danh sách task kèm thống kê chi tiết theo từng trạng thái
  */
 export function formatTaskListMessage(tasks: ITask[]): string {
   if (tasks.length === 0) {
     return `🎉 <b>Chưa có task nào được khởi tạo trong nhóm này!</b>`;
   }
 
-  const header = `📋 <b>TỔNG HỢP DANH SÁCH TASK (${tasks.length})</b>\n`;
+  // 1. Thống kê số lượng theo từng TaskStatus
+  const stats = tasks.reduce(
+    (acc, task) => {
+      acc[task.status] = (acc[task.status] || 0) + 1;
+      return acc;
+    },
+    {
+      [TaskStatus.PENDING]: 0,
+      [TaskStatus.ACCEPTED]: 0,
+      //   [TaskStatus.IN_PROGRESS]: 0,
+      [TaskStatus.COMPLETED]: 0,
+      [TaskStatus.CANCELLED]: 0,
+    } as Record<TaskStatus, number>,
+  );
+
+  // 2. Tạo phần header & dashboard thống kê
+  const header = `📋 <b>TỔNG HỢP DANH SÁCH TASK (${tasks.length})</b>`;
+  const summary = [
+    `📊 <b>Thống kê:</b>`,
+    `• ${getStatusIcon(TaskStatus.PENDING)} Chờ tiếp nhận (PENDING): <b>${stats[TaskStatus.PENDING]}</b>`,
+    `• ${getStatusIcon(TaskStatus.ACCEPTED)} Đã tiếp nhận (ACCEPTED): <b>${stats[TaskStatus.ACCEPTED]}</b>`,
+    // `• ${getStatusIcon(TaskStatus.IN_PROGRESS)} Đang thực hiện (IN_PROGRESS): <b>${stats[TaskStatus.IN_PROGRESS]}</b>`,
+    `• ${getStatusIcon(TaskStatus.COMPLETED)} Đã hoàn thành (COMPLETED): <b>${stats[TaskStatus.COMPLETED]}</b>`,
+    `• ${getStatusIcon(TaskStatus.CANCELLED)} Đã hủy (CANCELLED): <b>${stats[TaskStatus.CANCELLED]}</b>`,
+  ].join("\n");
+
+  // 3. Format danh sách từng task
   const items = tasks.map((t, index) => {
     const taskId = (t._id as object).toString();
     const safeAssignee = escapeHtml(t.assignee);
     const safeTitle = escapeHtml(t.title);
     const icon = getStatusIcon(t.status);
 
-    return `${index + 1}.${icon} <b>[${t.status}]</b> @${safeAssignee}: ${safeTitle}\n   └ 🆔 <code>${taskId}</code>`;
+    return `${index + 1}. ${icon} <b>[${t.status}]</b> @${safeAssignee}: ${safeTitle}\n   └ 🆔 <code>${taskId}</code>`;
   });
 
-  return [header, ...items].join("\n\n");
+  return [header, summary, ...items].join("\n\n");
 }
 
 /**
@@ -113,3 +139,22 @@ export function formatTaskCompletedMessage(task: ITask): string {
     `🎉 <b>Trạng thái:</b> <code>${task.status}</code>`,
   ].join("\n");
 }
+
+/**
+ * Format thông báo khi task chuyển sang CANCELLED
+ */
+export function formatTaskCancelledMessage(task: ITask): string {
+  const taskId = (task._id as object).toString();
+  const safeAssignee = escapeHtml(task.assignee);
+  const safeTitle = escapeHtml(task.title);
+
+  return [
+    `❌ <b>TASK ĐÃ ĐƯỢC HỦY</b>`,
+    ``,
+    `🆔 <b>Task ID:</b> <code>${taskId}</code>`,
+    `👤 <b>Người thực hiện:</b> @${safeAssignee}`,
+    `📋 <b>Nội dung:</b> ${safeTitle}`,
+    `🚫 <b>Trạng thái:</b> <code>${task.status}</code>`,
+  ].join("\n");
+}
+
