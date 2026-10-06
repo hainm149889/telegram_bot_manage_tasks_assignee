@@ -1,0 +1,37 @@
+datasource db {
+  provider = "postgresql" // Hoặc "sqlite" / "mysql" tùy theo database bạn sử dụng
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Task {
+  id               String     @id @default(uuid())
+  telegramChatId   BigInt
+  telegramMessageId Int
+  assignee         String
+  title            String
+  status           TaskStatus @default(PENDING)
+  
+  // Thông tin người tạo (sender)
+  creatorId        BigInt?
+  creatorUsername  String?
+  creatorFirstName String?
+  creatorLastName  String?
+
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@unique([telegramChatId, telegramMessageId])
+  @@index([assignee])
+  @@index([telegramChatId])
+}
