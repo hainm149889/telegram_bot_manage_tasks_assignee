@@ -158,3 +158,70 @@ export function formatTaskCancelledMessage(task: ITask): string {
   ].join("\n");
 }
 
+/**
+ * Format tin nhắn nhắc nhở tự động theo khung giờ, gom nhóm theo assignee và tag (@mention)
+ */
+export function formatTaskReminderMessage(
+  tasks: ITask[],
+  timeSlot?: string,
+): string {
+  if (tasks.length === 0) {
+    return "";
+  }
+
+  // 1. Gom nhóm task theo assignee
+  const tasksByAssignee = new Map<string, { pending: ITask[]; accepted: ITask[] }>();
+
+  for (const task of tasks) {
+    const rawAssignee = (task.assignee || "Unknown").trim().replace(/^@/, "");
+    if (!tasksByAssignee.has(rawAssignee)) {
+      tasksByAssignee.set(rawAssignee, { pending: [], accepted: [] });
+    }
+    const group = tasksByAssignee.get(rawAssignee)!;
+    if (task.status === TaskStatus.PENDING) {
+      group.pending.push(task);
+    } else if (task.status === TaskStatus.ACCEPTED) {
+      group.accepted.push(task);
+    }
+  }
+
+  const timeLabel = timeSlot ? ` [${timeSlot}]` : "";
+  const header = [
+    `⏰ <b>NHẮC NHỞ TIẾN ĐỘ CÔNG VIỆC${timeLabel}</b>`,
+    `<i>Các bạn vui lòng kiểm tra và cập nhật trạng thái các task tồn đọng:</i>`,
+  ].join("\n");
+
+  const assigneeSections: string[] = [];
+
+  for (const [assignee, group] of tasksByAssignee.entries()) {
+    const sectionLines: string[] = [];
+    const safeAssignee = escapeHtml(assignee);
+    sectionLines.push(`👤 <b>@${safeAssignee}</b>:`);
+
+    if (group.pending.length > 0) {
+      sectionLines.push(`  ⏳ <i>Chờ tiếp nhận (${group.pending.length}):</i>`);
+      for (const t of group.pending) {
+        const taskId = (t._id as object).toString();
+        const safeTitle = escapeHtml(t.title);
+        sectionLines.push(`    • ${safeTitle} <code>(${taskId.slice(-6)})</code>`);
+      }
+    }
+
+    if (group.accepted.length > 0) {
+      sectionLines.push(`  👌 <i>Chờ hoàn thành (${group.accepted.length}):</i>`);
+      for (const t of group.accepted) {
+        const taskId = (t._id as object).toString();
+        const safeTitle = escapeHtml(t.title);
+        sectionLines.push(`    • ${safeTitle} <code>(${taskId.slice(-6)})</code>`);
+      }
+    }
+
+    assigneeSections.push(sectionLines.join("\n"));
+  }
+
+  const footer = `💡 <i>Mẹo: Reply tin nhắn task với <b>ok</b> / thả 👍 để nhận việc, reply <b>/done</b> hoặc <b>xong</b> để hoàn thành!</i>`;
+
+  return [header, ...assigneeSections, footer].join("\n\n");
+}
+
+

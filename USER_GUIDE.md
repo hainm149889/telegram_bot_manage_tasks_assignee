@@ -115,6 +115,34 @@ Bot sẽ tự động bắt sự kiện reaction và gửi thông báo xác nh�
 
 ---
 
+## 6. Tự Động Nhắc Nhở Tiến Độ (Task Reminder)
+
+Bot tự động kiểm tra và nhắc nhở các task chưa chuyển trạng thái vào **3 khung giờ mỗi ngày** (bao gồm cả Thứ 7 và Chủ Nhật, múi giờ Việt Nam):
+* **10:00 sáng**
+* **14:00 chiều**
+* **16:30 chiều**
+
+### Các trạng thái được nhắc nhở:
+* ⏳ `PENDING`: Task chưa được tiếp nhận (chưa reply nhận hoặc thả reaction).
+* 👌 `ACCEPTED`: Task đã tiếp nhận nhưng chưa đánh dấu hoàn thành (`COMPLETED`).
+
+### Đặc điểm nhắc nhở:
+* Bot ping trực tiếp vào nhóm chat và **tag thẳng `@assignee`** tương ứng để thông báo.
+* Gom nhóm danh sách task theo từng assignee để tránh spam nhiều tin nhắn.
+* Nếu nhóm không có task nào tồn đọng, bot sẽ im lặng, không làm phiền nhóm.
+
+### Kiểm tra nhắc nhở thủ công:
+Bạn có thể chủ động kiểm tra ngay các task cần nhắc nhở bằng lệnh:
+```text
+/remind
+```
+hoặc:
+```text
+/nhacnho
+```
+
+---
+
 ## 📊 Bảng Tóm Tắt
 
 | Thao tác | Cú pháp / Hành động | Ví dụ |
@@ -126,4 +154,7 @@ Bot sẽ tự động bắt sự kiện reaction và gửi thông báo xác nh�
 | **Hoàn thành (ID)** | `/done <taskId>` | `/done 65f1a2b3c4d5e6f7a8b9c0d1` |
 | **Hủy task (Reply)** | Reply `/cancel` hoặc các từ khóa (`thôi`, `hủy`, `dừng`, `stop`, `bỏ`,...) | Reply tin task: `hủy` hoặc `/cancel` |
 | **Hủy task (ID)** | `/cancel <taskId>` | `/cancel 65f1a2b3c4d5e6f7a8b9c0d1` |
+| **Nhắc nhở tự động** | Tự động chạy lúc `10:00`, `14:00`, `16:30` mỗi ngày | Tự động gửi vào nhóm và tag `@assignee` |
+| **Kiểm tra nhắc nhở** | `/remind` hoặc `/nhacnho` | `/remind` |
+
 

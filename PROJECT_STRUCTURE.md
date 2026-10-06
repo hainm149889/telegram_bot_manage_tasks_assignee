@@ -25,8 +25,10 @@ telegram-task-bot/
     ├── bot/                     # (Mở rộng) Khởi tạo, middleware và cấu hình bot grammY
     ├── commands/                # (Mở rộng) Xử lý các bot commands (/task, /list, /done,...)
     ├── database/                # (Mở rộng) Khởi tạo Prisma Client instance & DB queries
-    ├── parser/                  # (Mở rộng) Module phân tích cú pháp tin nhắn để tạo task
-    └── task/                    # (Mở rộng) Business logic xử lý công việc / task
+    ├── parser/                  # Module phân tích cú pháp tin nhắn để tạo task
+    ├── scheduler/               # Scheduler lập lịch tự động (nhắc nhở 10:00, 14:00, 16:30)
+    │   └── task-reminder.ts
+    └── services/                # Business logic xử lý công việc / task (MongoDB & Mongoose)
 ```
 
 ---

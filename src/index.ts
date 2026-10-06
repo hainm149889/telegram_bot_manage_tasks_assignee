@@ -14,6 +14,7 @@ import {
   cancelTaskById,
   getAllTasksByChatId,
   acceptTaskByMessageId,
+  getUnfinishedTasksByChatId,
 } from "./services/task";
 import {
   sendTaskCreatedReply,
@@ -21,7 +22,9 @@ import {
   formatTaskCompletedMessage,
   formatTaskAcceptedMessage,
   formatTaskCancelledMessage,
+  formatTaskReminderMessage,
 } from "./telegram/response-formatter";
+import { initTaskReminderScheduler } from "./scheduler/task-reminder";
 
 const bot = new Bot(env.telegramBotToken);
 
@@ -189,6 +192,48 @@ bot.command(["cancel", "cancelled"], async (ctx) => {
   } catch (error) {
     console.error("[ERROR] Failed to execute /cancel command:", error);
     await ctx.reply("❌ Đã có lỗi xảy ra khi hủy task.");
+  }
+});
+
+// 4. Xử lý lệnh /remind (Nhắc nhở kiểm tra tiến độ thủ công)
+bot.command(["remind", "nhacnho"], async (ctx) => {
+  try {
+    const chatId = ctx.chat?.id;
+    if (!chatId) return;
+
+    if (!env.telegramAllowedChatIds.includes(chatId.toString())) {
+      console.log(`[IGNORED /remind] Non-whitelisted chat: ${chatId}`);
+      return;
+    }
+
+    const unfinishedTasks = await getUnfinishedTasksByChatId(chatId);
+    if (unfinishedTasks.length === 0) {
+      await ctx.reply("🎉 Hiện tại nhóm không có task nào đang chờ xử lý (PENDING hoặc ACCEPTED)!", {
+        parse_mode: "HTML",
+        reply_parameters: ctx.msg?.message_id
+          ? { message_id: ctx.msg.message_id }
+          : undefined,
+      });
+      return;
+    }
+
+    const now = new Date();
+    const timeString = now.toLocaleTimeString("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const reminderMsg = formatTaskReminderMessage(unfinishedTasks, timeString);
+    await ctx.reply(reminderMsg, {
+      parse_mode: "HTML",
+      reply_parameters: ctx.msg?.message_id
+        ? { message_id: ctx.msg.message_id }
+        : undefined,
+    });
+  } catch (error) {
+    console.error("[ERROR] Failed to execute /remind command:", error);
+    await ctx.reply("❌ Đã có lỗi xảy ra khi thực hiện nhắc nhở.");
   }
 });
 
@@ -378,6 +423,10 @@ bot.on(["message", "channel_post"], async (ctx) => {
 
 async function main() {
   await connectDatabase();
+
+  // Khởi động Scheduler nhắc nhở tự động 10:00, 14:00, 16:30
+  initTaskReminderScheduler(bot);
+
   // Khai báo rõ ràng nhận sự kiện message_reaction
   bot.start({
     allowed_updates: ["message", "edited_message", "message_reaction"],

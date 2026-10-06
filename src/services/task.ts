@@ -74,7 +74,7 @@ export async function acceptTaskByMessageId(
       {
         $set: { status: TaskStatus.ACCEPTED },
       },
-      { new: true },
+      { returnDocument: "after" },
     );
   } catch (error) {
     console.error(
@@ -101,7 +101,7 @@ export async function completeTaskByMessageId(
       {
         $set: { status: TaskStatus.COMPLETED },
       },
-      { new: true },
+      { returnDocument: "after" },
     );
   } catch (error) {
     console.error(
@@ -128,7 +128,7 @@ export async function completeTaskById(
       {
         $set: { status: TaskStatus.COMPLETED },
       },
-      { new: true },
+      { returnDocument: "after" },
     );
   } catch (error) {
     console.error(
@@ -155,7 +155,7 @@ export async function cancelTaskByMessageId(
       {
         $set: { status: TaskStatus.CANCELLED },
       },
-      { new: true },
+      { returnDocument: "after" },
     );
   } catch (error) {
     console.error(
@@ -182,7 +182,7 @@ export async function cancelTaskById(
       {
         $set: { status: TaskStatus.CANCELLED },
       },
-      { new: true },
+      { returnDocument: "after" },
     );
   } catch (error) {
     console.error(
@@ -192,4 +192,25 @@ export async function cancelTaskById(
     throw error;
   }
 }
+
+/**
+ * Lấy danh sách các task chưa hoàn thành (PENDING hoặc ACCEPTED) trong nhóm chat
+ */
+export async function getUnfinishedTasksByChatId(
+  telegramChatId: number,
+): Promise<ITask[]> {
+  try {
+    return await TaskModel.find({
+      telegramChatId,
+      status: { $in: [TaskStatus.PENDING, TaskStatus.ACCEPTED] },
+    }).sort({ createdAt: 1 });
+  } catch (error) {
+    console.error(
+      `[TaskService] Error fetching unfinished tasks for chatId=${telegramChatId}:`,
+      error,
+    );
+    throw error;
+  }
+}
+
 
