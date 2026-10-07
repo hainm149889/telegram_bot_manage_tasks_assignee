@@ -77,9 +77,9 @@ dist
 
 #### `.env` *(Format mẫu)*
 ```env
-TELEGRAM_BOT_TOKEN=8686000523:AAGLUYWCXDKzK61_8pFrOnh0VkX81XAQNkk
-DATABASE_URL="postgresql://user:password@localhost:5432/task_bot_db"
-TELEGRAM_ALLOWED_CHAT_IDS=-5319474691
+TELEGRAM_BOT_TOKEN="your_telegram_bot_token_here"
+DATABASE_URL="mongodb+srv://user:password@cluster.mongodb.net/dbname"
+TELEGRAM_ALLOWED_CHAT_IDS="-100xxxxxxxxxx"
 ```
 
 ---

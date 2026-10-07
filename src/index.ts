@@ -427,6 +427,21 @@ async function main() {
   // Khởi động Scheduler nhắc nhở tự động 10:00, 14:00, 16:30
   initTaskReminderScheduler(bot);
 
+  // Bắt lỗi toàn cục của bot grammY
+  bot.catch((err) => {
+    console.error(`[Bot Error] Error while handling update ${err.ctx?.update?.update_id}:`, err.error);
+  });
+
+  // Ngắt kết nối polling khi tiến trình dừng hoặc restart (tránh 409 Conflict)
+  process.once("SIGINT", () => {
+    console.log("[Bot] Stopping bot gracefully (SIGINT)...");
+    bot.stop();
+  });
+  process.once("SIGTERM", () => {
+    console.log("[Bot] Stopping bot gracefully (SIGTERM)...");
+    bot.stop();
+  });
+
   // Khai báo rõ ràng nhận sự kiện message_reaction
   bot.start({
     allowed_updates: ["message", "edited_message", "message_reaction"],

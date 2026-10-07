@@ -25,6 +25,22 @@ function getStatusIcon(status: TaskStatus): string {
   }
 }
 
+/**
+ * Tạo link Telegram trỏ đến tin nhắn gốc trong nhóm chat: https://t.me/c/<cleanChatId>/<messageId>
+ */
+export function formatTelegramMessageLink(
+  chatId: number,
+  messageId: number,
+): string {
+  let cleanChatId = chatId.toString();
+  if (cleanChatId.startsWith("-100")) {
+    cleanChatId = cleanChatId.slice(4);
+  } else if (cleanChatId.startsWith("-")) {
+    cleanChatId = cleanChatId.slice(1);
+  }
+  return `https://t.me/c/${cleanChatId}/${messageId}`;
+}
+
 export function formatTaskCreatedMessage(task: ITask): string {
   const taskId = (task._id as object).toString();
   const safeAssignee = escapeHtml(task.assignee);
@@ -105,8 +121,12 @@ export function formatTaskListMessage(tasks: ITask[]): string {
     const safeAssignee = escapeHtml(t.assignee);
     const safeTitle = escapeHtml(t.title);
     const icon = getStatusIcon(t.status);
+    const messageUrl = formatTelegramMessageLink(
+      t.telegramChatId,
+      t.telegramMessageId,
+    );
 
-    return `${index + 1}. ${icon} <b>[${t.status}]</b> @${safeAssignee}: ${safeTitle}\n   └ 🆔 <code>${taskId}</code>`;
+    return `${index + 1}. ${icon} <b>[${t.status}]</b> @${safeAssignee}: ${safeTitle}\n   └ 🆔 <a href="${messageUrl}">#${taskId.slice(-6)}</a> <code>(${taskId})</code>`;
   });
 
   return [header, summary, ...items].join("\n\n");
@@ -203,7 +223,11 @@ export function formatTaskReminderMessage(
       for (const t of group.pending) {
         const taskId = (t._id as object).toString();
         const safeTitle = escapeHtml(t.title);
-        sectionLines.push(`    • ${safeTitle} <code>(${taskId.slice(-6)})</code>`);
+        const messageUrl = formatTelegramMessageLink(
+          t.telegramChatId,
+          t.telegramMessageId,
+        );
+        sectionLines.push(`    • ${safeTitle} (<a href="${messageUrl}">#${taskId.slice(-6)}</a>)`);
       }
     }
 
@@ -212,7 +236,11 @@ export function formatTaskReminderMessage(
       for (const t of group.accepted) {
         const taskId = (t._id as object).toString();
         const safeTitle = escapeHtml(t.title);
-        sectionLines.push(`    • ${safeTitle} <code>(${taskId.slice(-6)})</code>`);
+        const messageUrl = formatTelegramMessageLink(
+          t.telegramChatId,
+          t.telegramMessageId,
+        );
+        sectionLines.push(`    • ${safeTitle} (<a href="${messageUrl}">#${taskId.slice(-6)}</a>)`);
       }
     }
 
